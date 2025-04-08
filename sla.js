@@ -1,61 +1,135 @@
 const express = require('express');
+const sqlite3 = require('sqlite3').verbose();
 
 const app = express();
-
 const PORT = 3000;
 
 app.use(express.json());
 
-let usuarios = [
-        { id: 1, nome: 'gabriel'},
-        { id: 2, nome: 'pedro'}
-];
+// Conectar ao banco de dados SQLite
+const db = new sqlite3.Database('./usuarios.db', (err) => {
+    if (err) {
+        console.error('Erro ao conectar ao banco de dados:', err.message);
+    } else {
+        console.log('Conectado ao banco de dados SQLite.');
+    }
+});
 
+// Criar tabela se não existir
+db.run(`
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL UNIQUE,
+        senha TEXT NOT NULL,
+        nome TEXT NOT NULL,
+        celular TEXT NOT NULL,
+        cpf TEXT NOT NULL UNIQUE,
+        cep TEXT NOT NULL,
+        endereco TEXT NOT NULL,
+        numero TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        tip TEXT NOT NULL DEFAULT 'USER',
+        update_at DATETIME CURRENT_TIMESTAMP NOT NULL
+    );
+`);
+
+
+// Rota para verificar se o servidor está funcionando
+app.get('/', (req, res) => {
+    res.send('Servidor funcionando!');
+});
+
+
+
+// Rota para adicionar um novo usuário
 app.post('/api/usuarios', (req, res) => {
+    const { email, senha, nome, celular, cpf, cep, endereco, numero } = req.body;
 
-    const novoUser = { id: usuarios.length + 1, nome: req.body.nome };
+    if (!email || !senha || !nome || !cpf || !cep) {
+        return res.status(400).send('Os campos "email", "senha", "nome", "cpf" e "cep" são obrigatórios.');
+    }
 
-    usuarios.push(novoUser);
+    console.log('Request body:', req.body); // Debugging log
+    if (!cep) {
+        console.error('CEP is undefined. Please check the request body.');
+    }
+
+    const query = `
+        INSERT INTO usuarios (email, senha, nome, celular, cpf, cep, endereco, numero, created_at, tip, update_at) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 'USER', datetime('now'));
+    `;
+    console.log('Dados recebidos:', { email, senha, nome, celular, cpf, cep, endereco, numero }); // Debugging log
+
+    db.run(query, [email, senha, nome, celular, cpf, cep, endereco, numero], function (err) {
+        if (err) {
+            return res.status(500).send('Erro ao adicionar usuário.');
+        }
+
+        const lastId = this.lastID; // Obter o último ID inserido
+        res.json({ id: lastId, message: 'Usuário adicionado com sucesso!' });
+    });
     
-    res.status(201).json(novoUser);
-
 });
 
 
+
+// Rota para listar todos os usuários
 app.get('/api/usuarios', (req, res) => {
+    const query = `SELECT * FROM usuarios`;
 
-    res.json(usuarios);
+    db.all(query, [], (err, rows) => {
+        if (err) {
+            return res.status(500).send('Erro ao buscar usuários.');
+        }
 
+        res.json(rows);
+    });
 });
 
-
-
+// Rota para atualizar um usuário
 app.put('/api/usuarios/:id', (req, res) => {
+    const { id } = req.params;
+    const { nome } = req.body;
 
-    const usuario = usuarios.find(u => u.id === parseInt(req.params.id));
+    if (!nome) {
+        return res.status(400).send('O campo "nome" é obrigatório.');
+    }
 
-    if (!usuario) return res.status(404).send('Usuario não encontrado');
+    const query = `UPDATE usuarios SET nome = ? WHERE id = ?`;
+    db.run(query, [nome, id], function (err) {
+        if (err) {
+            return res.status(500).send('Erro ao atualizar usuário.');
+        }
 
-    usuario.nome = req.body.nome;
+        if (this.changes === 0) {
+            return res.status(404).send('Usuário não encontrado.');
+        }
 
-    res.json(usuario);
+        res.json({ id: parseInt(id), nome });
+    });
 });
 
-
-
+// Rota para deletar um usuário
 app.delete('/api/usuarios/:id', (req, res) => {
+    const { id } = req.params;
 
-    const usuarioIndex = usuarios.findIndex(u => u.id === parseInt(req.params.id));
+    const query = `DELETE FROM usuarios WHERE id = ?`;
+    db.run(query, [id], function (err) {
+        if (err) {
+            return res.status(500).send('Erro ao deletar usuário.');
+        }
 
-    if(usuarioIndex === -1) return res.status(404).send('user n encontrado');
+        if (this.changes === 0) {
+            return res.status(404).send('Usuário não encontrado.');
+        }
 
-    const usuarioDeletado = usuarios.splice(usuarioIndex, 1);
-
-    res.json(usuarioDeletado);
-
+        res.json({ id: parseInt(id) });
+    });
 });
 
-
+// Iniciar o servidor
 app.listen(PORT, () => {
-    console.log(`http://localhost:${PORT}`);
+    console.log(`https://serve-teste.onrender.com/api/usuarios`);
+    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log(`Acesse a API em http://localhost:${PORT}/api/usuarios`);
 });
