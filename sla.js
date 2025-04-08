@@ -4,6 +4,15 @@ const sqlite3 = require('sqlite3').verbose();
 const app = express();
 const PORT = 3000;
 
+// Middleware para autorização (disponível para todos)
+const cors = require('cors');
+app.use(cors());
+
+
+
+
+
+
 app.use(express.json());
 
 // Conectar ao banco de dados SQLite
@@ -49,16 +58,11 @@ app.post('/api/usuarios', (req, res) => {
         return res.status(400).send('Os campos "email", "senha", "nome", "cpf" e "cep" são obrigatórios.');
     }
 
-    console.log('Request body:', req.body); // Debugging log
-    if (!cep) {
-        console.error('CEP is undefined. Please check the request body.');
-    }
-
     const query = `
         INSERT INTO usuarios (email, senha, nome, celular, cpf, cep, endereco, numero, created_at, tip, update_at) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), 'USER', datetime('now'));
     `;
-    console.log('Dados recebidos:', { email, senha, nome, celular, cpf, cep, endereco, numero }); // Debugging log
+    // console.log('Dados recebidos:', { email, senha, nome, celular, cpf, cep, endereco, numero }); // Debugging log
 
     db.run(query, [email, senha, nome, celular, cpf, cep, endereco, numero], function (err) {
         if (err) {
@@ -130,6 +134,4 @@ app.delete('/api/usuarios/:id', (req, res) => {
 // Iniciar o servidor
 app.listen(PORT, () => {
     console.log(`https://serve-teste.onrender.com/api/usuarios`);
-    console.log(`Servidor rodando na porta ${PORT}`);
-    console.log(`Acesse a API em http://localhost:${PORT}/api/usuarios`);
 });
